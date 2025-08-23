@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Churrascaria Gaucho - Pedido via WhatsApp</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-orange-50 to-red-50 min-h-screen">
+    <div id="app"></div>
+
+    <script>
+        // ====== Utilitários ======
+        const WHATSAPP_NUMBER = "5511939426652"; // Número atualizado
+        const ADMIN_PASSWORD = "170183mf";
+        const LS_MENU_KEY = "menuData-v1";
+
+        function currency(v) {
+            if (typeof v !== "number" || isNaN(v)) return "R$ 0,00";
+            return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+        }
+
+        function encodeWhatsAppText(text) {
+            return encodeURIComponent(text);
+        }
+
+        // ====== Dados Padrão ======
+        const defaultMenu = [
+            {
+                id: "cat-marmitex",
+                name: "MARMITEX",
+                products: [
+                    { id: "m1", name: "Costela no Bafo", sizes: { P: 28.0, G: 32.0 } },
+                    { id: "m2", name: "Brisket", sizes: { P: 28.0, G: 32.0 } },
+                    { id: "m3", name: "Fraldinha Texana", sizes: { P: 28.0, G: 32.0 } },
+                    { id: "m4", name: "Filé de frango grelhado", sizes: { P: 20.0, G: 23.0 } },
+                    { id: "m5", name: "Calabresa acebolada", sizes: { P: 23.0, G: 26.0 } },
+                    { id: "m6", name: "Bife em tiras com fritas", sizes: { P: 26.0, G: 28.0 } },
+                    { id: "m7", name: "Bife acebolado", sizes: { P: 26.0, G: 28.0 } },
+                    { id: "m8", name: "Omelete (Tomate, Cebola e queijo)", sizes: { P: 22.0, G: 25.0 } },
+                    { id: "m9", name: "Filé de frango à milanesa", sizes: { P: 23.0, G: 27.0 } },
+                    { id: "m10", name: "Bife à milanesa", sizes: { P: 27.0, G: 30.0 } },
+                    { id: "m11", name: "Parmegiana de frango", sizes: { P: 26.0, G: 28.0 } },
+                    { id: "m12", name: "Parmegiana de carne", sizes: { P: 29.0, G: 32.0 } },
+                    { id: "m13", name: "Frango Assado", sizes: { P: 23.0, G: 26.0 } },
+                    { id: "m14", name: "Linguiça", sizes: { P: 23.0, G: 26.0 } },
+                ],
+            },
+            {
+                id: "cat-feijoada",
+                name: "FEIJOADA LIGHT",
+                description: "Todos os Sábados – Acompanha Farofa, Couve e Torresmo, vinagrete, bisteca, banana, gomo de laranja, molho de pimenta e caipirinha",
+                products: [
+                    { id: "f1", name: "Feijoada Light (sábados)", sizes: { P: 35.0, M: 65.0, G: 95.0 } },
+                ],
+            },
+            {
+                id: "cat-massas",
+                name: "MASSAS ITALIANA",
+                products: [
+                    { id: "i1", name: "Rondelli Presunto e Queijo", price: 30.0 },
+                    { id: "i2", name: "Rondelli Verde 4 Queijos", price: 31.5 },
+                    { id: "i3", name: "Torttelli Amarelo Bacon e Creanchees", price: 31.5 },
+                    { id: "i4", name: "Capeletti de Carne", price: 28.0 },
+                    { id: "i5", name: "Raviolli Branco Mussarela", price: 28.0 },
+                    { id: "i6", name: "Pastelzinho de Carne e Queijo (6 un)", price: 20.0 },
+                    { id: "i7", name: "Sorrentino Presunto e Mussarela", price: 30.0 },
+                    { id: "i8", name: "Conchigliione 5 Queijos", price: 31.5 },
+                    { id: "i9", name: "Nhoque de Batata", price: 25.0 },
+                    { id: "i10", name: "Adicional Arroz", price: 10.0 },
+                    { id: "i11", name: "Adicional Feijão", price: 10.0 },
+                ],
+            },
+            {
+                id: "cat-porcoes",
+                name: "PORÇÕES",
+                products: [
+                    { id: "p1", name: "Pão com carne", price: 15.0 },
+                ],
+            },
+            {
+                id: "cat-bebidas",
+                name: "BEBIDAS",
+                products: [
+                    { id: "b1", name: "Refrigerante Lata", price: 5.0 },
+                    { id: "b2", name: "Refrigerante 600ml", price: 8.0 },
+                    { id: "b3", name: "Água Mineral", price: 3.0 },
+                    { id: "b4", name: "Suco Natural", price: 7.0 },
+                    { id: "b5", name: "Cerveja Lata", price: 6.0 },
+                ],
+            },
+        ];
+
+        // ====== Estado da Aplicação ======
+        let state = {
+            currentView: 'menu',
+            cart: [],
+            customerInfo: { name: '', phone: '', address: '', deliveryZone: '' },
+            menu: JSON.parse(localStorage.getItem(LS_MENU_KEY)) || defaultMenu,
+            isAdmin: false,
+            deliveryOptions: [
+                { id: 'vargem', name: 'Vargem Grande', price: 3.0 },
+                { id: 'colonia', name: 'Colonia ou Silveira', price: 5.0 },
+                { id: 'parelheiros', name: 'Parelheiros', price: 10.0 },
+                { id: 'almeida', name: 'Jd Almeida', price: 15.0 },
+                { id: 'outros', name: 'Outros', price: 25.0 }
+            ]
+        };
+
+        // ====== Funções do Carrinho ======
+        function addToCart(product, size = null, price = null) {
+            const finalPrice = price || (size ? product.sizes[size] : product.price);
+            const cartItem = {
+                id: Date.now(),
+                productId: product.id,
+                name: product.name,
+                size: size,
+                price: finalPrice,
+                quantity: 1
+            };
+
+            state.cart.push(cartItem);
+            render();
+
+            // Feedback visual
+            showNotification('Item adicionado ao carrinho!');
+        }
+
+        function removeFromCart(itemId) {
+            state.cart = state.cart.filter(item => item.id !== itemId);
+            render();
+        }
+
+        function updateQuantity(itemId, newQuantity) {
+            if (newQuantity <= 0) {
+                removeFromCart(itemId);
+                return;
+            }
+
+            const item = state.cart.find(item => item.id === itemId);
+            if (item) {
+                item.quantity = newQuantity;
+                render();
+            }
+        }
+
+        function getCartTotal() {
+            return state.cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+        }
+
+        function getDeliveryPrice() {
+            if (!state.customerInfo.deliveryZone) return 0;
+            const delivery = state.deliveryOptions.find(d => d.id === state.customerInfo.deliveryZone);
+            return delivery ? delivery.price : 0;
+        }
+
+        function getFinalTotal() {
+            return getCartTotal() + getDeliveryPrice();
+        }
+
+        // ====== Funções de Navegação ======
+        function setView(view) {
+            state.currentView = view;
+            render();
+        }
+
+        // ====== Função de Notificação ======
+        function showNotification(message) {
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 fade-in';
+            notification.textContent = message;
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+        // ====== Função de Envio WhatsApp ======
+        function sendWhatsAppOrder() {
+            if (state.cart.length === 0) {
+                alert('Seu carrinho está vazio!');
+                return;
+            }
+
+            if (!state.customerInfo.name || !state.customerInfo.phone) {
+                alert('Por favor, preencha seu nome e telefone!');
+                return;
+            }
+
+            let message = `🍖 *PEDIDO CHURRASCARIA GAUCHO* 🍖\n\n`;
+            message += `👤 *Cliente:* ${state.customerInfo.name}\n`;
+            message += `📱 *Telefone:* ${state.customerInfo.phone}\n`;
+            if (state.customerInfo.address) {
+                message += `📍 *Endereço:* ${state.customerInfo.address}\n`;
+            }
+            message += `\n📋 *ITENS DO PEDIDO:*\n`;
+
+            state.cart.forEach(item => {
+                message += `• ${item.name}`;
+                if (item.size) message += ` (${item.size})`;
+                message += ` - ${item.quantity}x ${currency(item.price)} = ${currency(item.price * item.quantity)}\n`;
+            });
+
+            message += `\n💰 *SUBTOTAL: ${currency(getCartTotal())}*\n`;
+
+            if (state.customerInfo.deliveryZone) {
+                const delivery = state.deliveryOptions.find(d => d.id === state.customerInfo.deliveryZone);
+                message += `🚚 *ENTREGA (${delivery.name}): ${currency(delivery.price)}*\n`;
+                message += `\n💰 *TOTAL FINAL: ${currency(getFinalTotal())}*\n\n`;
+            } else {
+                message += `\n💰 *TOTAL: ${currency(getCartTotal())}*\n\n`;
+            }
+
+            message += `Obrigado pela preferência! 🙏`;
+
+            const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeWhatsAppText(message)}`;
+            window.open(whatsappUrl, '_blank');
+        }
+
+        // ====== Componentes de Renderização ======
+        function renderHeader() {
+            return `
+                <header class="bg-gradient-to-r from-red-600 to-orange-600 text-white shadow-lg">
+                    <div class="container mx-auto px-4 py-6">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <div class="text-3xl">🥩</div>
+                                <div>
+                                    <h1 class="text-2xl font-bold">Churrascaria Gaucho</h1>
+                                    <p class="text-red-100">Sabor autêntico do Sul</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-4">
+                                <button onclick="setView('cart')" class="relative bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors">
+                                    🛒 Carrinho
+                                    ${state.cart.length > 0 ? `<span class="absolute -top-2 -right-2 bg-yellow-400 text-red-800 text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">${state.cart.length}</span>` : ''}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+            `;
+        }
+
+        function renderNavigation() {
+            const views = [
+                { key: 'menu', label: '📋 Cardápio', icon: '🍽️' },
+                { key: 'cart', label: '🛒 Carrinho', icon: '🛒' },
+                { key: 'info', label: '📝 Seus Dados', icon: '👤' }
+            ];
+
+            return `
+                <nav class="bg-white shadow-md sticky top-0 z-40">
+                    <div class="container mx-auto px-4">
+                        <div class="flex space-x-1">
+                            ${views.map(view => `
+                                <button
+                                    onclick="setView('${view.key}')"
+                                    class="flex-1 py-3 px-4 text-center font-medium transition-colors ${
+                                        state.currentView === view.key
+                                            ? 'text-red-600 border-b-2 border-red-600 bg-red-50'
+                                            : 'text-gray-600 hover:text-red-600 hover:bg-gray-50'
+                                    }"
+                                >
+                                    <span class="text-lg">${view.icon}</span>
+                                    <span class="ml-2 hidden sm:inline">${view.label.replace(/^[^\s]+ /, '')}</span>
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                </nav>
+            `;
+        }
+
+        function renderMenu() {
+            return `
+                <div class="container mx-auto px-4 py-6">
+                    <div class="space-y-8">
+                        ${state.menu.map(category => `
+                            <div class="bg-white rounded-xl shadow-lg overflow-hidden fade-in">
+                                <div class="bg-gradient-to-r from-red-500 to-orange-500 text-white p-6">
+                                    <h2 class="text-2xl font-bold">${category.name}</h2>
+                                    ${category.description ? `<p class="text-red-100 mt-2">${category.description}</p>` : ''}
+                                </div>
+                                <div class="p-6">
+                                    <div class="grid gap-4">
+                                        ${category.products.map(product => `
+                                            <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                                                <div class="flex justify-between items-start">
+                                                    <div class="flex-1">
+                                                        <h3 class="font-semibold text-gray-800 text-lg">${product.name}</h3>
+                                                        ${product.sizes ? `
+                                                            <div class="mt-3 flex flex-wrap gap-2">
+                                                                ${Object.entries(product.sizes).map(([size, price]) => `
+                                                                    <button
+                                                                        onclick="addToCart(${JSON.stringify(product).replace(/"/g, '&quot;')}, '${size}')"
+                                                                        class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                                                                    >
+                                                                        ${size} - ${currency(price)}
+                                                                    </button>
+                                                                `).join('')}
+                                                            </div>
+                                                        ` : `
+                                                            <div class="mt-3 flex justify-between items-center">
+                                                                <span class="text-xl font-bold text-red-600">${currency(product.price)}</span>
+                                                                <button
+                                                                    onclick="addToCart(${JSON.stringify(product).replace(/"/g, '&quot;')})"
+                                                                    class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+                                                                >
+                                                                    Adicionar
+                                                                </button>
+                                                            </div>
+                                                        `}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderCart() {
+            if (state.cart.length === 0) {
+                return `
+                    <div class="container mx-auto px-4 py-12">
+                        <div class="bg-white rounded-xl shadow-lg p-8 text-center">
+                            <div class="text-6xl mb-4">🛒</div>
+                            <h2 class="text-2xl font-bold text-gray-800 mb-2">Seu carrinho está vazio</h2>
+                            <p class="text-gray-600 mb-6">Adicione alguns itens deliciosos do nosso cardápio!</p>
+                            <button onclick="setView('menu')" class="bg-red-500 hover:bg-red-600 text-white px-8 py-3 rounded-lg font-medium transition-colors">
+                                Ver Cardápio
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="container mx-auto px-4 py-6">
+                    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                        <div class="bg-gradient-to-r from-red-500 to-orange-500 text-white p-6">
+                            <h2 class="text-2xl font-bold">Seu Carrinho</h2>
+                            <p class="text-red-100">${state.cart.length} ${state.cart.length === 1 ? 'item' : 'itens'}</p>
+                        </div>
+                        <div class="p-6">
+                            <div class="space-y-4">
+                                ${state.cart.map(item => `
+                                    <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                                        <div class="flex-1">
+                                            <h3 class="font-semibold text-gray-800">${item.name}</h3>
+                                            ${item.size ? `<p class="text-sm text-gray-600">Tamanho: ${item.size}</p>` : ''}
+                                            <p class="text-red-600 font-bold">${currency(item.price)}</p>
+                                        </div>
+                                        <div class="flex items-center space-x-3">
+                                            <div class="flex items-center space-x-2">
+                                                <button
+                                                    onclick="updateQuantity(${item.id}, ${item.quantity - 1})"
+                                                    class="w-8 h-8 bg-gray-200 hover:bg-gray-300 rounded-full flex items-center justify-center transition-colors"
+                                                >
+                                                    -
+                                                </button>
+                                                <span class="w-8 text-center font-medium">${item.quantity}</span>
+                                                <button
+                                                    onclick="updateQuantity(${item.id}, ${item.quantity + 1})"
+                                                    class="w-8 h-8 bg-gray-200 hover:bg-gray-300 rounded-full flex items-center justify-center transition-colors"
+                                                >
+                                                    +
+                                                </button>
+                                            </div>
+                                            <button
+                                                onclick="removeFromCart(${item.id})"
+                                                class="text-red-500 hover:text-red-700 p-2 transition-colors"
+                                                title="Remover item"
+                                            >
+                                                🗑️
+                                            </button>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+
+                            <div class="mt-6 pt-6 border-t border-gray-200">
+                                <div class="flex justify-between items-center text-xl font-bold">
+                                    <span>Subtotal:</span>
+                                    <span class="text-red-600">${currency(getCartTotal())}</span>
+                                </div>
+                                <p class="text-sm text-gray-600 mt-2">* Taxa de entrega será calculada na finalização</p>
+
+                                <div class="mt-6 flex space-x-4">
+                                    <button
+                                        onclick="setView('menu')"
+                                        class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-3 rounded-lg font-medium transition-colors"
+                                    >
+                                        Continuar Comprando
+                                    </button>
+                                    <button
+                                        onclick="setView('info')"
+                                        class="flex-1 bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg font-medium transition-colors"
+                                    >
+                                        Finalizar Pedido
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderCustomerInfo() {
+            return `
+                <div class="container mx-auto px-4 py-6">
+                    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                        <div class="bg-gradient-to-r from-red-500 to-orange-500 text-white p-6">
+                            <h2 class="text-2xl font-bold">Seus Dados</h2>
+                            <p class="text-red-100">Preencha para finalizar o pedido</p>
+                        </div>
+                        <div class="p-6">
+                            <form class="space-y-4" onsubmit="event.preventDefault(); sendWhatsAppOrder();">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Nome Completo *</label>
+                                    <input
+                                        type="text"
+                                        value="${state.customerInfo.name}"
+                                        onchange="state.customerInfo.name = this.value"
+                                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                                        placeholder="Digite seu nome completo"
+                                        required
+                                    >
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Telefone *</label>
+                                    <input
+                                        type="tel"
+                                        value="${state.customerInfo.phone}"
+                                        onchange="state.customerInfo.phone = this.value"
+                                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                                        placeholder="(11) 99999-9999"
+                                        required
+                                    >
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Zona de Entrega</label>
+                                    <select
+                                        value="${state.customerInfo.deliveryZone}"
+                                        onchange="state.customerInfo.deliveryZone = this.value; render();"
+                                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                                    >
+                                        <option value="">Selecione a zona de entrega</option>
+                                        ${state.deliveryOptions.map(option => `
+                                            <option value="${option.id}" ${state.customerInfo.deliveryZone === option.id ? 'selected' : ''}>
+                                                ${option.name} - ${currency(option.price)}
+                                            </option>
+                                        `).join('')}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Endereço de Entrega</label>
+                                    <textarea
+                                        value="${state.customerInfo.address}"
+                                        onchange="state.customerInfo.address = this.value"
+                                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                                        placeholder="Rua, número, bairro, cidade..."
+                                        rows="3"
+                                    ></textarea>
+                                </div>
+
+                                ${state.cart.length > 0 ? `
+                                    <div class="bg-gray-50 p-4 rounded-lg">
+                                        <h3 class="font-semibold text-gray-800 mb-2">Resumo do Pedido:</h3>
+                                        <div class="text-sm text-gray-600 space-y-1">
+                                            ${state.cart.map(item => `
+                                                <div class="flex justify-between">
+                                                    <span>${item.name} ${item.size ? `(${item.size})` : ''} x${item.quantity}</span>
+                                                    <span>${currency(item.price * item.quantity)}</span>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                        ${getDeliveryPrice() > 0 ? `
+                                            <div class="border-t border-gray-300 mt-2 pt-2">
+                                                <div class="flex justify-between text-sm">
+                                                    <span>Subtotal:</span>
+                                                    <span>${currency(getCartTotal())}</span>
+                                                </div>
+                                                <div class="flex justify-between text-sm">
+                                                    <span>Entrega:</span>
+                                                    <span>${currency(getDeliveryPrice())}</span>
+                                                </div>
+                                                <div class="flex justify-between font-bold text-red-600 text-lg mt-1">
+                                                    <span>Total:</span>
+                                                    <span>${currency(getFinalTotal())}</span>
+                                                </div>
+                                            </div>
+                                        ` : `
+                                            <div class="border-t border-gray-300 mt-2 pt-2 font-bold text-red-600">
+                                                Total: ${currency(getCartTotal())}
+                                            </div>
+                                        `}
+                                    </div>
+
+                                    <button
+                                        type="submit"
+                                        class="w-full bg-green-500 hover:bg-green-600 text-white py-4 rounded-lg font-bold text-lg transition-colors flex items-center justify-center space-x-2"
+                                    >
+                                        <span>📱</span>
+                                        <span>Enviar Pedido via WhatsApp</span>
+                                    </button>
+                                ` : `
+                                    <div class="text-center py-8">
+                                        <p class="text-gray-600 mb-4">Seu carrinho está vazio</p>
+                                        <button
+                                            onclick="setView('menu')"
+                                            class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+                                        >
+                                            Ver Cardápio
+                                        </button>
+                                    </div>
+                                `}
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ====== Função Principal de Renderização ======
+        function render() {
+            const app = document.getElementById('app');
+
+            let content = '';
+            content += renderHeader();
+            content += renderNavigation();
+
+            switch (state.currentView) {
+                case 'menu':
+                    content += renderMenu();
+                    break;
+                case 'cart':
+                    content += renderCart();
+                    break;
+                case 'info':
+                    content += renderCustomerInfo();
+                    break;
+            }
+
+            app.innerHTML = content;
+        }
+
+        // ====== Inicialização ======
+        document.addEventListener('DOMContentLoaded', function() {
+            render();
+        });
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'973696eaa1337e09',t:'MTc1NTkwOTk1MS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
