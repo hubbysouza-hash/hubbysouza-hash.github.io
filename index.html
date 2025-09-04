@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Churrascaria Gaucho - Pedido via WhatsApp</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .pulse-green { animation: pulse-green 2s infinite; }
+        @keyframes pulse-green { 0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); } 50% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); } }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-orange-50 to-red-50 min-h-screen">
+    <div id="app"></div>
+
+    <script>
+        // ====== Utilitários ======
+        const WHATSAPP_NUMBER = "5511939426652"; // Número para delivery
+        const ADMIN_PASSWORD = "170183mf";
+        const LS_MENU_KEY = "menuData-v1";
+
+        function currency(v) {
+            if (typeof v !== "number" || isNaN(v)) return "R$ 0,00";
+            return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+        }
+
+        function encodeWhatsAppText(text) {
+            return encodeURIComponent(text);
+        }
+
+        // ====== Dados Padrão ======
+        const defaultMenu = [
+            {
+                id: "cat-marmitex",
+                name: "MARMITEX",
+                products: [
+                    { id: "m1", name: "Costela no Bafo", sizes: { P: 28.0, G: 32.0 } },
+                    { id: "m2", name: "Brisket", sizes: { P: 28.0, G: 32.0 } },
+                    { id: "m3", name: "Fraldinha Texana", sizes: { P: 28.0, G: 32.0 } },
+                    { id: "m4", name: "Filé de frango grelhado", sizes: { P: 20.0, G: 23.0 } },
+                    { id: "m5", name: "Calabresa acebolada", sizes: { P: 23.0, G: 26.0 } },
+                    { id: "m6", name: "Bife em tiras com fritas", sizes: { P: 26.0, G: 28.0 } },
+                    { id: "m7", name: "Bife acebolado", sizes: { P: 26.0, G: 28.0 } },
+                    { id: "m8", name: "Omelete (Tomate, Cebola e queijo)", sizes: { P: 22.0, G: 25.0 } },
+                    { id: "m9", name: "Filé de frango à milanesa", sizes: { P: 23.0, G: 27.0 } },
+                    { id: "m10", name: "Bife à milanesa", sizes: { P: 27.0, G: 30.0 } },
+                    { id: "m11", name: "Parmegiana de frango", sizes: { P: 26.0, G: 28.0 } },
+                    { id: "m12", name: "Parmegiana de carne", sizes: { P: 29.0, G: 32.0 } },
+                    { id: "m13", name: "Frango Assado", sizes: { P: 23.0, G: 26.0 } },
+                    { id: "m14", name: "Linguiça", sizes: { P: 23.0, G: 26.0 } },
+                ],
+            },
+            {
+                id: "cat-porcao",
+                name: "PORÇÃO",
+                products: [
+                    { id: "p1", name: "Pão com Carne", price: 15.0 },
+                    { id: "p2", name: "Contra Filé", sizes: { P: 60.0, G: 80.0 } },
+                    { id: "p3", name: "Carne Assada (Costela no bafo, Brisket e Fraldinha)", sizes: { "Meio Kilo": 40.0, "Kilo": 80.0 } },
+                ],
+            },
+            {
+                id: "cat-feijoada",
+                name: "FEIJOADA LIGHT",
+                description: "Todos os Sábados – Acompanha Farofa, Couve e Torresmo, vinagrete, bisteca, banana, gomo de laranja, molho de pimenta e caipirinha",
+                products: [
+                    { id: "f1", name: "Feijoada Light (sábados)", sizes: { P: 35.0, M: 65.0, G: 95.0 } },
+                ],
+            },
+            {
+                id: "cat-massas",
+                name: "MASSAS ITALIANA",
+                products: [
+                    { id: "i1", name: "Rondelli Presunto e Queijo", price: 30.0 },
+                    { id: "i2", name: "Rondelli Verde 4 Queijos", price: 31.5 },
+                    { id: "i3", name: "Torttelli Amarelo Bacon e Creanchees", price: 32.0 },
+                    { id: "i4", name: "Lasanha Bolonhesa", price: 28.0 },
+                    { id: "i5", name: "Espaguete à Carbonara", price: 26.0 },
+                ],
+            },
+            {
+                id: "cat-bebidas",
+                name: "BEBIDAS",
+                products: [
+                    { id: "b1", name: "Refrigerante Lata", price: 6.0 },
+                    { id: "b2", name: "Refrigerante 2L", price: 12.0 },
+                    { id: "b3", name: "Água Mineral", price: 4.0 },
+                    { id: "b4", name: "Suco Polpa litro", price: 17.0 },
+                    { id: "b5", name: "Cerveja Long Neck", price: 7.0 },
+                ],
+            },
+        ];
+
+        // ====== Estado Global ======
+        let state = {
+            currentView: 'menu',
+            cart: [],
+            menu: JSON.parse(localStorage.getItem(LS_MENU_KEY)) || defaultMenu,
+            customerInfo: { name: '', phone: '', address: '', neighborhood: '', paymentMethod: '' }
+        };
+
+        // ====== Taxas de Entrega ======
+        const deliveryFees = {
+            'vargem-grande': { name: 'Vargem Grande', fee: 3.00 },
+            'colonia-silveira': { name: 'Colônia e Silveira', fee: 5.00 },
+            'parelheiros': { name: 'Parelheiros', fee: 10.00 },
+            'jardim-silveira': { name: 'Jardim Silveira', fee: 15.00 },
+            'outros': { name: 'Outros', fee: 25.00 }
+        };
+
+        // ====== Funções do Carrinho ======
+        function addToCart(productId, categoryId, size = null, quantity = 1) {
+            const category = state.menu.find(cat => cat.id === categoryId);
+            const product = category.products.find(p => p.id === productId);
+
+            let price;
+            if (product.sizes && size) {
+                price = product.sizes[size];
+            } else {
+                price = product.price;
+            }
+
+            const cartItem = {
+                id: `${productId}-${size || 'default'}-${Date.now()}`,
+                productId,
+                categoryId,
+                name: product.name,
+                size,
+                price,
+                quantity
+            };
+
+            state.cart.push(cartItem);
+            renderApp();
+        }
+
+        function removeFromCart(cartItemId) {
+            state.cart = state.cart.filter(item => item.id !== cartItemId);
+            renderApp();
+        }
+
+        function updateCartQuantity(cartItemId, newQuantity) {
+            if (newQuantity <= 0) {
+                removeFromCart(cartItemId);
+                return;
+            }
+
+            const item = state.cart.find(item => item.id === cartItemId);
+            if (item) {
+                item.quantity = newQuantity;
+                renderApp();
+            }
+        }
+
+        function getCartTotal() {
+            return state.cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+        }
+
+        function getDeliveryFee() {
+            if (!state.customerInfo.neighborhood) return 0;
+            return deliveryFees[state.customerInfo.neighborhood]?.fee || 0;
+        }
+
+        function getFinalTotal() {
+            return getCartTotal() + getDeliveryFee();
+        }
+
+        // ====== Funções do WhatsApp ======
+        function sendWhatsAppOrder() {
+            if (state.cart.length === 0) {
+                alert('Seu carrinho está vazio!');
+                return;
+            }
+
+            if (!state.customerInfo.name || !state.customerInfo.phone || !state.customerInfo.paymentMethod) {
+                alert('Por favor, preencha seu nome, telefone e forma de pagamento!');
+                return;
+            }
+
+            let message = `🍖 *PEDIDO - CHURRASCARIA GAUCHO* 🍖\n\n`;
+            message += `👤 *Cliente:* ${state.customerInfo.name}\n`;
+            message += `📱 *Telefone:* ${state.customerInfo.phone}\n`;
+            if (state.customerInfo.address) {
+                message += `📍 *Endereço:* ${state.customerInfo.address}\n`;
+            }
+            if (state.customerInfo.neighborhood) {
+                const neighborhood = deliveryFees[state.customerInfo.neighborhood];
+                message += `🏘️ *Bairro:* ${neighborhood.name}\n`;
+            }
+            message += `💳 *Pagamento:* ${state.customerInfo.paymentMethod}\n`;
+            message += `\n📋 *ITENS DO PEDIDO:*\n`;
+
+            state.cart.forEach((item, index) => {
+                message += `${index + 1}. ${item.name}`;
+                if (item.size) message += ` (${item.size})`;
+                message += ` - ${item.quantity}x ${currency(item.price)} = ${currency(item.price * item.quantity)}\n`;
+            });
+
+            message += `\n💰 *Subtotal:* ${currency(getCartTotal())}\n`;
+
+            const deliveryFee = getDeliveryFee();
+            if (deliveryFee > 0) {
+                message += `🚚 *Taxa de Entrega:* ${currency(deliveryFee)}\n`;
+            }
+
+            message += `💰 *TOTAL FINAL: ${currency(getFinalTotal())}*\n\n`;
+            message += `Obrigado pela preferência! 🙏`;
+
+            const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeWhatsAppText(message)}`;
+            window.open(whatsappUrl, '_blank');
+        }
+
+        // ====== Componentes de Renderização ======
+        function renderHeader() {
+            return `
+                <header class="bg-gradient-to-r from-red-600 to-orange-600 text-white shadow-lg">
+                    <div class="container mx-auto px-4 py-6">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <div class="text-3xl">🥩</div>
+                                <div>
+                                    <h1 class="text-2xl font-bold">Churrascaria Gaucho</h1>
+                                    <p class="text-red-100">Sabor autêntico do Sul</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-4">
+                                <button onclick="toggleView('cart')" class="relative bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors">
+                                    <span class="text-lg">🛒</span>
+                                    ${state.cart.length > 0 ? `<span class="absolute -top-2 -right-2 bg-green-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">${state.cart.length}</span>` : ''}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+            `;
+        }
+
+        function renderMenu() {
+            return `
+                <div class="container mx-auto px-4 py-8">
+                    <div class="grid gap-8">
+                        ${state.menu.map(category => `
+                            <div class="bg-white rounded-xl shadow-lg overflow-hidden fade-in">
+                                <div class="bg-gradient-to-r from-red-500 to-orange-500 text-white px-6 py-4">
+                                    <h2 class="text-xl font-bold">${category.name}</h2>
+                                    ${category.description ? `<p class="text-red-100 text-sm mt-1">${category.description}</p>` : ''}
+                                </div>
+                                <div class="p-6">
+                                    <div class="grid gap-4">
+                                        ${category.products.map(product => `
+                                            <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                                                <div class="flex justify-between items-start mb-3">
+                                                    <h3 class="font-semibold text-gray-800">${product.name}</h3>
+                                                </div>
+                                                ${product.sizes ? `
+                                                    <div class="flex flex-wrap gap-2">
+                                                        ${Object.entries(product.sizes).map(([size, price]) => `
+                                                            <button onclick="addToCart('${product.id}', '${category.id}', '${size}')"
+                                                                    class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                                                                ${size} - ${currency(price)}
+                                                            </button>
+                                                        `).join('')}
+                                                    </div>
+                                                ` : `
+                                                    <button onclick="addToCart('${product.id}', '${category.id}')"
+                                                            class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+                                                        Adicionar - ${currency(product.price)}
+                                                    </button>
+                                                `}
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderCart() {
+            if (state.cart.length === 0) {
+                return `
+                    <div class="container mx-auto px-4 py-8">
+                        <div class="bg-white rounded-xl shadow-lg p-8 text-center">
+                            <div class="text-6xl mb-4">🛒</div>
+                            <h2 class="text-2xl font-bold text-gray-800 mb-2">Carrinho Vazio</h2>
+                            <p class="text-gray-600 mb-6">Adicione alguns itens deliciosos ao seu pedido!</p>
+                            <button onclick="toggleView('menu')" class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-medium transition-colors">
+                                Ver Cardápio
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="container mx-auto px-4 py-8">
+                    <div class="grid lg:grid-cols-3 gap-8">
+                        <div class="lg:col-span-2">
+                            <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                                <div class="bg-gradient-to-r from-red-500 to-orange-500 text-white px-6 py-4">
+                                    <h2 class="text-xl font-bold">Seu Pedido</h2>
+                                </div>
+                                <div class="p-6">
+                                    <div class="space-y-4">
+                                        ${state.cart.map(item => `
+                                            <div class="flex items-center justify-between border-b border-gray-200 pb-4">
+                                                <div class="flex-1">
+                                                    <h3 class="font-semibold text-gray-800">${item.name}</h3>
+                                                    ${item.size ? `<p class="text-sm text-gray-600">Tamanho: ${item.size}</p>` : ''}
+                                                    <p class="text-sm text-gray-600">${currency(item.price)} cada</p>
+                                                </div>
+                                                <div class="flex items-center space-x-3">
+                                                    <button onclick="updateCartQuantity('${item.id}', ${item.quantity - 1})"
+                                                            class="w-8 h-8 bg-gray-200 hover:bg-gray-300 rounded-full flex items-center justify-center transition-colors">
+                                                        -
+                                                    </button>
+                                                    <span class="font-semibold w-8 text-center">${item.quantity}</span>
+                                                    <button onclick="updateCartQuantity('${item.id}', ${item.quantity + 1})"
+                                                            class="w-8 h-8 bg-gray-200 hover:bg-gray-300 rounded-full flex items-center justify-center transition-colors">
+                                                        +
+                                                    </button>
+                                                    <button onclick="removeFromCart('${item.id}')"
+                                                            class="text-red-500 hover:text-red-700 ml-2 transition-colors">
+                                                        🗑️
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="lg:col-span-1">
+                            <div class="bg-white rounded-xl shadow-lg overflow-hidden sticky top-4">
+                                <div class="bg-gradient-to-r from-green-500 to-green-600 text-white px-6 py-4">
+                                    <h2 class="text-xl font-bold">Finalizar Pedido</h2>
+                                </div>
+                                <div class="p-6">
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
+                                            <input type="text" value="${state.customerInfo.name}"
+                                                   onchange="updateCustomerInfo('name', this.value)"
+                                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                                                   placeholder="Seu nome completo">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Telefone *</label>
+                                            <input type="tel" value="${state.customerInfo.phone}"
+                                                   onchange="updateCustomerInfo('phone', this.value)"
+                                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                                                   placeholder="(11) 99999-9999">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Endereço (Delivery)</label>
+                                            <textarea value="${state.customerInfo.address}"
+                                                      onchange="updateCustomerInfo('address', this.value)"
+                                                      class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                                                      rows="3" placeholder="Rua, número, bairro..."></textarea>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Bairro (Taxa de Entrega)</label>
+                                            <select value="${state.customerInfo.neighborhood}"
+                                                    onchange="updateCustomerInfo('neighborhood', this.value)"
+                                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent">
+                                                <option value="">Selecione o bairro</option>
+                                                ${Object.entries(deliveryFees).map(([key, data]) => `
+                                                    <option value="${key}" ${state.customerInfo.neighborhood === key ? 'selected' : ''}>
+                                                        ${data.name} - ${currency(data.fee)}
+                                                    </option>
+                                                `).join('')}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Forma de Pagamento *</label>
+                                            <select value="${state.customerInfo.paymentMethod}"
+                                                    onchange="updateCustomerInfo('paymentMethod', this.value)"
+                                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent">
+                                                <option value="">Selecione a forma de pagamento</option>
+                                                <option value="PIX" ${state.customerInfo.paymentMethod === 'PIX' ? 'selected' : ''}>PIX</option>
+                                                <option value="Dinheiro" ${state.customerInfo.paymentMethod === 'Dinheiro' ? 'selected' : ''}>Dinheiro</option>
+                                                <option value="Cartão de Crédito" ${state.customerInfo.paymentMethod === 'Cartão de Crédito' ? 'selected' : ''}>Cartão de Crédito</option>
+                                                <option value="Cartão de Débito" ${state.customerInfo.paymentMethod === 'Cartão de Débito' ? 'selected' : ''}>Cartão de Débito</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="border-t pt-4">
+                                            <div class="space-y-2 mb-4">
+                                                <div class="flex justify-between items-center">
+                                                    <span class="text-sm text-gray-600">Subtotal:</span>
+                                                    <span class="text-sm">${currency(getCartTotal())}</span>
+                                                </div>
+                                                ${getDeliveryFee() > 0 ? `
+                                                    <div class="flex justify-between items-center">
+                                                        <span class="text-sm text-gray-600">Taxa de Entrega:</span>
+                                                        <span class="text-sm">${currency(getDeliveryFee())}</span>
+                                                    </div>
+                                                ` : ''}
+                                                <div class="flex justify-between items-center border-t pt-2">
+                                                    <span class="text-lg font-bold">Total Final:</span>
+                                                    <span class="text-2xl font-bold text-green-600">${currency(getFinalTotal())}</span>
+                                                </div>
+                                            </div>
+
+                                            <button onclick="sendWhatsAppOrder()"
+                                                    class="w-full bg-green-500 hover:bg-green-600 text-white py-3 px-6 rounded-lg font-bold text-lg transition-colors pulse-green">
+                                                📱 Enviar pelo WhatsApp
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-8 text-center">
+                        <button onclick="toggleView('menu')" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition-colors">
+                            ← Continuar Comprando
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ====== Funções de Controle ======
+        function toggleView(view) {
+            state.currentView = view;
+            renderApp();
+        }
+
+        function updateCustomerInfo(field, value) {
+            state.customerInfo[field] = value;
+        }
+
+        function renderApp() {
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                ${renderHeader()}
+                ${state.currentView === 'menu' ? renderMenu() : renderCart()}
+            `;
+        }
+
+        // ====== Inicialização ======
+        document.addEventListener('DOMContentLoaded', function() {
+            renderApp();
+        });
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'97a0524fc1dc82f5',t:'MTc1NzAxODYzMS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
