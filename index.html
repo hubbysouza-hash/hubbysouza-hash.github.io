@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Churrascaria Gaucho - Pedido via WhatsApp</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .fade-in { animation: fadeIn 0.28s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .pulse-green { animation: pulse-green 2s infinite; }
+    @keyframes pulse-green { 0%,100%{ box-shadow: 0 0 0 0 rgba(34,197,94,0.6);}50%{box-shadow:0 0 0 10px rgba(34,197,94,0);} }
+  </style>
+</head>
+<body>
+    <!-- Botão Admin -->
+    <button id="adminBtn" class="fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded-xl shadow-lg">Admin</button>
+    <script>
+    document.getElementById('adminBtn').addEventListener('click', function(){
+        const senha = prompt('Digite a senha de administrador:');
+        if(senha === '170183_Mf'){
+            alert('Acesso liberado! Painel administrativo será exibido.');
+            document.getElementById('admin-panel')?.classList.remove('hidden');
+        } else {
+            alert('Senha incorreta!');
+        }
+    });
+    </script>
+  <div id="app"></div>
+
+  <!-- =====================================================
+       Arquivo único (HTML + JS) organizado para fácil edição
+       - Edite o objeto `defaultMenu` abaixo para adicionar itens
+       - As partes mais importantes estão comentadas
+     ===================================================== -->
+
+  <script>
+  // ========================= CONFIGURAÇÕES =========================
+  const WHATSAPP_NUMBER = '5511939426652'; // número para envio
+  const ADMIN_PASSWORD = '170183mf';
+  const LS_MENU_KEY = 'churrascaria_menu_v1';
+  const LS_CART_KEY = 'churrascaria_cart_v1';
+
+  // ========================= UTILITÁRIOS ==========================
+  function currency(v){ if(typeof v!=='number' || isNaN(v)) return 'R$ 0,00'; return v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
+  function encodeWhatsAppText(t){ return encodeURIComponent(t); }
+  function uid(prefix = ''){ return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+  // ========================= DADOS PADRÃO (EDITÁVEIS) =========================
+  // Para adicionar novas categorias / produtos, altere apenas este objeto.
+  const defaultMenu = [
+    {
+      id: 'cat-marmitex',
+      name: 'MARMITEX',
+      products: [
+        { id: 'm1', name: 'Costela no Bafo', sizes: { P: 28.0, G: 32.0 } },
+        { id: 'm2', name: 'Brisket', sizes: { P: 28.0, G: 32.0 } },
+        { id: 'm3', name: 'Fraldinha Texana', sizes: { P: 28.0, G: 32.0 } },
+        { id: 'm4', name: 'File de frango grelhado', sizes: { P: 20.0, G: 23.0 } },
+        { id: 'm5', name: 'Calabresa acebolada', sizes: { P: 23.0, G: 26.0 } },
+{ id: 'm6', name: 'Bife em tiras com fritas', sizes: { P: 26.0, G: 28.0 } },
+        { id: 'm7', name: 'Bife Acebolado', sizes: { P: 26.0, G: 28.0 } },
+        { id: 'm8', name: 'Omelete(Tomate,cebola e queijo)', sizes: { P: 22.0, G: 25.0 } },
+        { id: 'm9', name: 'Parmegiana de Carne', sizes: { P: 29.0, G: 32.0 } },
+        { id: 'm10', name: 'Parmegiana de Frango', sizes: { P: 26.0, G: 28.0 } },
+      ]
+    },
+    {
+      id: 'cat-porcao',
+      name: 'PORCAO',
+      products: [
+        { id: 'p1', name: 'Pao com Carne', price: 20.0 },
+        { id: 'p2', name: 'Contra File', sizes: { P: 60.0, G: 90.0 } },
+        { id: 'p3', name: 'Fraldinha Texana', sizes: { "Meio Kilo": 60.0, "Kilo": 120.0 } },
+        { id: 'p4', name: 'Brisket', sizes: { "Meio Kilo": 60.0, "Kilo": 120.0 } },
+        { id: 'p5', name: 'Costela no Bafo', sizes: { "Meio Kilo": 60.0, "Kilo": 120.0 } },
+
+        ]
+
+
+    },
+    {
+      id: 'cat-bebidas',
+      name: 'BEBIDAS',
+      products: [
+        { id: 'b1', name: 'Refrigerante Lata', price: 6.0 },
+        { id: 'b2', name: 'Coca Cola 2L', price: 18.0 },
+        { id: 'b3', name: 'Agua Mineral', price: 4.5 },
+        { id: 'b4', name: 'Refrigerante 2L', price: 15.0 },
+      ]
+    }
+  ];
+
+  // ========================= TAXAS DE ENTREGA =========================
+  const deliveryFees = {
+  'vargem-grande': { name: 'Vargem Grande', fee: 3.00 },
+    'colonia': { name: 'Colonia ', fee: 5.00 },
+    'parelheiros': { name: 'Parelheiros', fee: 10.00 },
+    'silveira': { name: ' Silveira', fee: 5.00 },
+    'vargem-grande 2': { name: 'Vargem Grande 2', fee: 9.00 },
+        'Alamos': { name: 'Alamos', fee: 15.00 },
+'Estrada-da-Barragem': { name: 'Estrada da Barragem', fee:8.00 },
+'Chacara-Sao-Silvestre': { name: 'Chacara Sao Silvestre', fee:12.00 },
+'Jardim-Aladim': { name: 'Jardim Aladim', fee:12.00 },
+'Jardim-Almeida': { name: 'Jardim Almeida', fee:15.00 },
+'Jardim-das-Oliveiras': { name: 'Jardim das Oliveiras', fee:7.00 },
+'Jardim-Progresso': { name: 'Jardim Progresso', fee:18.00 },
+'Jardim-Santa-Fe': { name: 'Jardim Santa Fe', fee:9.00 },
+'Nova-America': { name: 'Nova America', fee:9.00 },
+'parque-Amazonas': { name: 'parque Amazonas', fee:9.00 },
+'parque-Recreio': { name: 'parque Recreio', fee:15.00 },
+'Recanto': { name: 'Recanto', fee:9.00 },
+'Santa-terezinha': { name: 'Santa terezinha', fee:7.00 },
+'Sao-Nicolau': { name: 'Sao-Nicolau', fee:15.00 },
+'Sao-Noberto': { name: 'Sao-Noberto', fee:15.00 },
+'Ursino-Ribeiro': { name: 'Ursino-Ribeiro', fee:15.00 },
+'Vila-Rocha': { name: 'Vila Rocha', fee:15.00 },
+'Vila-Rochel': { name: 'Vila Rochel', fee:12.00 },
+
+
+
+
+
+
+
+
+
+
+
+        
+ 
+
+ }; 
+
+  // ========================= ESTADO GLOBAL =========================
+  let state = {
+    currentView: 'menu', // 'menu' ou 'cart'
+    cart: JSON.parse(localStorage.getItem(LS_CART_KEY) || '[]'),
+    menu: JSON.parse(localStorage.getItem(LS_MENU_KEY) || 'null') || defaultMenu,
+    customerInfo: { name: '', phone: '', address: '', neighborhood: '', paymentMethod: '' }
+  };
+
+  // ========================= PERSISTÊNCIA SIMPLES =========================
+  function saveMenuToStorage(){ localStorage.setItem(LS_MENU_KEY, JSON.stringify(state.menu)); }
+  function saveCartToStorage(){ localStorage.setItem(LS_CART_KEY, JSON.stringify(state.cart)); }
+
+  // ========================= CARRINHO =========================
+  function addToCart(productId, categoryId, size = null, quantity = 1){
+    const category = state.menu.find(c => c.id === categoryId);
+    if(!category) return;
+    const product = category.products.find(p => p.id === productId);
+    if(!product) return;
+
+    let price = null;
+    if(product.sizes && size){ price = product.sizes[size]; }
+    else if(typeof product.price === 'number'){ price = product.price; }
+    else { price = 0; }
+
+    const existing = state.cart.find(i => i.productId===productId && i.size===size);
+    if(existing){ existing.quantity += quantity; }
+    else {
+      state.cart.push({ id: uid('c-'), productId, categoryId, name: product.name, size, price, quantity });
+    }
+    saveCartToStorage(); renderApp();
+  }
+
+  function removeFromCart(cartItemId){ state.cart = state.cart.filter(i=>i.id!==cartItemId); saveCartToStorage(); renderApp(); }
+  function updateCartQuantity(cartItemId, newQuantity){ if(newQuantity<=0){ removeFromCart(cartItemId); return; } const it = state.cart.find(i=>i.id===cartItemId); if(it){ it.quantity = newQuantity; saveCartToStorage(); renderApp(); } }
+
+  function getCartTotal(){ return state.cart.reduce((s,i)=>s + (i.price * i.quantity), 0); }
+  function getDeliveryFee(){ if(!state.customerInfo.neighborhood) return 0; return deliveryFees[state.customerInfo.neighborhood]?.fee || 0; }
+  function getFinalTotal(){ return getCartTotal() + getDeliveryFee(); }
+
+  // ========================= WHATSAPP / ENVIO =========================
+  function sendWhatsAppOrder(){
+    if(state.cart.length===0){ alert('Seu carrinho esta vazio!'); return; }
+    if(!state.customerInfo.name || !state.customerInfo.phone || !state.customerInfo.paymentMethod){ alert('Preencha nome, telefone e forma de pagamento.'); return; }
+
+    let message = '*??? PEDIDO - CHURRASCARIA GAUCHO*\n\n';
+    message += `?? *Cliente:* ${state.customerInfo.name}\n`;
+    message += `?? *Telefone:* ${state.customerInfo.phone}\n`;
+    if(state.customerInfo.address) message += `?? *Endereco:* ${state.customerInfo.address}\n`;
+    if(state.customerInfo.neighborhood){ const nb = deliveryFees[state.customerInfo.neighborhood]; message += `??? *Bairro:* ${nb.name}\n`; }
+    message += `?? *Pagamento:* ${state.customerInfo.paymentMethod}\n\n`;
+    message += '*?? ITENS DO PEDIDO:*\n';
+
+    state.cart.forEach((item, idx)=>{
+      message += `${idx+1}. ${item.name}`;
+      if(item.size) message += ` (${item.size})`;
+      message += ` - ${item.quantity}x ${currency(item.price)} = ${currency(item.price * item.quantity)}\n`;
+    });
+
+    message += `\n?? *Subtotal:* ${currency(getCartTotal())}\n`;
+    const df = getDeliveryFee(); if(df>0) message += `?? *Taxa de Entrega:* ${currency(df)}\n`;
+    message += `*TOTAL: ${currency(getFinalTotal())}*\n\n`;
+    message += 'Obrigado pela preferência! ??';
+
+    const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeWhatsAppText(message)}`;
+    window.open(url, '_blank');
+  }
+
+  // ========================= RENDER COMPONENTS =========================
+  function renderHeader(){
+    return `
+      <header class="bg-gradient-to-r from-red-600 to-orange-600 text-white shadow-lg">
+        <div class="container mx-auto px-4 py-6">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+              <div class="text-3xl">??</div>
+              <div>
+                <h1 class="text-2xl font-bold">Churrascaria Gaucho</h1>
+                <p class="text-red-100">Delivery das 11 as 16:30 hs</p>
+              </div>
+            </div>
+            <div class="flex items-center space-x-4">
+              <button onclick="toggleView('cart')" class="relative bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors">
+                <span class="text-lg">??</span>
+                ${state.cart.length>0?`<span class="absolute -top-2 -right-2 bg-green-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">${state.cart.length}</span>`:''}
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+    `;
+  }
+
+  function renderMenu(){
+    return `
+      <div class="container mx-auto px-4 py-8">
+        <div class="grid gap-8">
+          ${state.menu.map(category=>`
+            <div class="bg-white rounded-xl shadow-lg overflow-hidden fade-in">
+              <div class="bg-gradient-to-r from-red-500 to-orange-500 text-white px-6 py-4">
+                <h2 class="text-xl font-bold">${category.name}</h2>
+                ${category.description?`<p class="text-red-100 text-sm mt-1">${category.description}</p>`:''}
+              </div>
+              <div class="p-6">
+                <div class="grid gap-4">
+                  ${category.products.map(product=>`
+                    <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div class="flex justify-between items-start mb-3">
+                        <h3 class="font-semibold text-gray-800">${product.name}</h3>
+                      </div>
+                      ${product.sizes ? `
+                        <div class="flex flex-wrap gap-2">
+                          ${Object.entries(product.sizes).map(([size, price])=>`
+                            <button onclick="addToCart('${product.id}','${category.id}','${size}')" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                              ${size} - ${currency(price)}
+                            </button>
+                          `).join('')}
+                        </div>
+                      ` : `
+                        <button onclick="addToCart('${product.id}','${category.id}')" class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+                          Adicionar - ${currency(product.price)}
+                        </button>
+                      `}
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderCart(){
+    if(state.cart.length===0){
+      return `
+        <div class="container mx-auto px-4 py-8">
+          <div class="bg-white rounded-xl shadow-lg p-8 text-center">
+            <div class="text-6xl mb-4">??</div>
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">Carrinho Vazio</h2>
+            <p class="text-gray-600 mb-6">Adicione alguns itens deliciosos ao seu pedido!</p>
+            <button onclick="toggleView('menu')" class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-medium transition-colors">Ver Cardápio</button>
+          </div>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="container mx-auto px-4 py-8">
+        <div class="grid lg:grid-cols-3 gap-8">
+          <div class="lg:col-span-2">
+            <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+              <div class="bg-gradient-to-r from-red-500 to-orange-500 text-white px-6 py-4">
+                <h2 class="text-xl font-bold">Seu Pedido</h2>
+              </div>
+              <div class="p-6">
+                <div class="space-y-4">
+                  ${state.cart.map(item=>`
+                    <div class="flex items-center justify-between border-b border-gray-200 pb-4">
+                      <div class="flex-1">
+                        <h3 class="font-semibold text-gray-800">${item.name}</h3>
+                        ${item.size?`<p class="text-sm text-gray-600">Tamanho: ${item.size}</p>`:''}
+                        <p class="text-sm text-gray-600">${currency(item.price)} cada</p>
+                      </div>
+                      <div class="flex items-center space-x-3">
+                        <button onclick="updateCartQuantity('${item.id}', ${item.quantity - 1})" class="w-8 h-8 bg-gray-200 hover:bg-gray-300 rounded-full flex items-center justify-center transition-colors">-</button>
+                        <span class="font-semibold w-8 text-center">${item.quantity}</span>
+                        <button onclick="updateCartQuantity('${item.id}', ${item.quantity + 1})" class="w-8 h-8 bg-gray-200 hover:bg-gray-300 rounded-full flex items-center justify-center transition-colors">+</button>
+                        <button onclick="removeFromCart('${item.id}')" class="text-red-500 hover:text-red-700 ml-2 transition-colors">??</button>
+                      </div>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="lg:col-span-1">
+            <div class="bg-white rounded-xl shadow-lg overflow-hidden sticky top-4">
+              <div class="bg-gradient-to-r from-green-500 to-green-600 text-white px-6 py-4">
+                <h2 class="text-xl font-bold">Finalizar Pedido</h2>
+              </div>
+              <div class="p-6">
+                <div class="space-y-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
+                    <input type="text" value="${state.customerInfo.name}" onchange="updateCustomerInfo('name', this.value)" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" placeholder="Seu nome completo">
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Telefone *</label>
+                    <input type="tel" value="${state.customerInfo.phone}" onchange="updateCustomerInfo('phone', this.value)" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" placeholder="(11) 99999-9999">
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Endereço (Delivery)</label>
+                    <textarea onchange="updateCustomerInfo('address', this.value)" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" rows="3" placeholder="Rua, número, complemento...">${state.customerInfo.address}</textarea>
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Bairro (Taxa de Entrega)</label>
+                    <select onchange="updateCustomerInfo('neighborhood', this.value)" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent">
+                      <option value="">Selecione o bairro</option>
+                      ${Object.entries(deliveryFees).map(([key,data])=>`<option value="${key}" ${state.customerInfo.neighborhood===key?'selected':''}>${data.name} - ${currency(data.fee)}</option>`).join('')}
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Forma de Pagamento *</label>
+                    <select onchange="updateCustomerInfo('paymentMethod', this.value)" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent">
+                      <option value="">Selecione a forma de pagamento</option>
+                      <option value="PIX" ${state.customerInfo.paymentMethod==='PIX'?'selected':''}>PIX</option>
+                      <option value="Dinheiro" ${state.customerInfo.paymentMethod==='Dinheiro'?'selected':''}>Dinheiro</option>
+                      <option value="Cartão de Crédito" ${state.customerInfo.paymentMethod==='Cartão de Crédito'?'selected':''}>Cartão de Crédito</option>
+                      <option value="Cartão de Débito" ${state.customerInfo.paymentMethod==='Cartão de Débito'?'selected':''}>Cartão de Débito</option>
+                    </select>
+                  </div>
+
+                  <div class="border-t pt-4">
+                    <div class="space-y-2 mb-4">
+                      <div class="flex justify-between items-center"><span class="text-sm text-gray-600">Subtotal:</span><span class="text-sm">${currency(getCartTotal())}</span></div>
+                      ${getDeliveryFee()>0?`<div class="flex justify-between items-center"><span class="text-sm text-gray-600">Taxa de Entrega:</span><span class="text-sm">${currency(getDeliveryFee())}</span></div>`:''}
+                      <div class="flex justify-between items-center border-t pt-2"><span class="text-lg font-bold">Total Final:</span><span class="text-2xl font-bold text-green-600">${currency(getFinalTotal())}</span></div>
+                    </div>
+
+                    <button onclick="sendWhatsAppOrder()" class="w-full bg-green-500 hover:bg-green-600 text-white py-3 px-6 rounded-lg font-bold text-lg transition-colors pulse-green">?? Enviar pelo WhatsApp</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-6 text-center">
+              <button onclick="toggleView('menu')" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition-colors">? Continuar Comprando</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // ========================= CONTROLE / HELPERS =========================
+  function toggleView(view){ state.currentView = view; renderApp(); }
+  function updateCustomerInfo(field, value){ state.customerInfo[field] = value; /* não persistimos no storage por enquanto */ }
+
+  // ========================= RENDER PRINCIPAL =========================
+  function renderApp(){
+    const app = document.getElementById('app');
+    app.innerHTML = `
+      ${renderHeader()}
+      ${state.currentView === 'menu' ? renderMenu() : renderCart()}
+    `;
+  }
+
+  // Inicialização
+  document.addEventListener('DOMContentLoaded', ()=>{ renderApp(); });
+
+  // ========================= FUNÇÕES ADMIN (OPCIONAL) =========================
+  // Essas funções facilitam edição futura e podem ser expostas via um painel admin.
+  function adminAddCategory(name, description=''){
+    const id = 'cat-' + name.toLowerCase().replace(/[^a-z0-9]+/g,'-');
+    state.menu.push({ id, name, description, products: [] }); saveMenuToStorage(); renderApp();
+  }
+
+  function adminAddProduct(categoryId, product){
+    // product = { id: 'x1', name: 'Item', price: 10 } ou { id:'x2', name:'Item', sizes: { P:10, G:15} }
+    const cat = state.menu.find(c=>c.id===categoryId); if(!cat) return; cat.products.push(product); saveMenuToStorage(); renderApp();
+  }
+
+  // Exponha funções no window para uso manual pelo dono do site (console)
+  window._cg = { state, saveMenuToStorage, adminAddCategory, adminAddProduct };
+
+  </script>
+    <!-- Painel Administrativo Oculto -->
+    <div id="admin-panel" class="hidden fixed bottom-20 right-4 bg-white border p-4 shadow-xl rounded-xl w-72">
+        <h2 class="font-bold mb-2">Painel Admin</h2>
+        <p>Configurações futuras podem ser adicionadas aqui.</p>
+    </div>
+<!-- Painel Admin -->
+<section id="adminPanel" class="hidden p-6 bg-gray-900 text-white mt-6 rounded-xl shadow-xl">
+ <h2 class="text-2xl font-bold mb-4">Painel Administrativo</h2>
+ <p class="mb-4">Gerencie itens do cardápio e bairros de entrega.</p>
+
+ <!-- CRUD Itens -->
+ <div class="mb-8">
+   <h3 class="text-xl font-semibold mb-2">Gerenciar Itens</h3>
+   <form id="itemForm" class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
+     <input id="itemNome" class="p-2 rounded text-black" placeholder="Nome do item">
+     <input id="itemPreco" class="p-2 rounded text-black" placeholder="Preço">
+     <button type="button" onclick="addItem()" class="bg-green-600 p-2 rounded">Adicionar</button>
+   </form>
+   <ul id="listaItens" class="space-y-2"></ul>
+ </div>
+
+ <!-- CRUD Bairros -->
+ <div class="mb-8">
+   <h3 class="text-xl font-semibold mb-2">Gerenciar Bairros de Entrega</h3>
+   <form id="bairroForm" class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
+     <input id="bairroNome" class="p-2 rounded text-black" placeholder="Nome do bairro">
+     <input id="bairroValor" class="p-2 rounded text-black" placeholder="Taxa de entrega">
+     <button type="button" onclick="addBairro()" class="bg-green-600 p-2 rounded">Adicionar</button>
+   </form>
+   <ul id="listaBairros" class="space-y-2"></ul>
+ </div>
+</section>
+
+<script>
+function abrirAdmin() {
+  const senha = prompt('Digite a senha administrativa:');
+  if (senha === '170183_Mf') {
+      document.getElementById('adminPanel').classList.remove('hidden');
+      alert('Acesso liberado!');
+  } else {
+      alert('Senha incorreta!');
+  }
+}
+</script>
+<script>
+let itens = JSON.parse(localStorage.getItem('itens')) || [];
+let bairros = JSON.parse(localStorage.getItem('bairros')) || [];
+
+function abrirAdmin() {
+  const senha = prompt('Digite a senha administrativa:');
+  if (senha === '170183_Mf') {
+      document.getElementById('adminPanel').classList.remove('hidden');
+      render(); salvar();
+  } else alert('Senha incorreta!');
+}
+
+function addItem() {
+  const nome = document.getElementById('itemNome').value;
+  const preco = document.getElementById('itemPreco').value;
+  if (!nome || !preco) return alert('Preencha todos os campos');
+  itens.push({ nome, preco });
+  render();
+}
+
+function salvar() {
+  localStorage.setItem('itens', JSON.stringify(itens));
+  localStorage.setItem('bairros', JSON.stringify(bairros));
+}
+
+function removeItem(i) {
+  itens.splice(i,1); render();
+}
+
+function addBairro() {
+  const nome = document.getElementById('bairroNome').value;
+  const valor = document.getElementById('bairroValor').value;
+  if (!nome || !valor) return alert('Preencha todos os campos');
+  bairros.push({ nome, valor });
+  render();
+}
+
+function removeBairro(i) {
+  bairros.splice(i,1); render();
+}
+
+function render() {
+  // Render itens
+  const itensList = document.getElementById('listaItens');
+  itensList.innerHTML = '';
+  itens.forEach((item,i)=>{
+    itensList.innerHTML += `<li class='bg-gray-800 p-2 rounded flex justify-between'>
+      <span>${item.nome} - R$ ${item.preco}</span>
+      <button onclick='removeItem(${i})' class='bg-red-600 px-2 rounded'>X</button>
+    </li>`;
+  });
+
+  // Render bairros
+  const bairrosList = document.getElementById('listaBairros');
+  bairrosList.innerHTML = '';
+  bairros.forEach((b,i)=>{
+    bairrosList.innerHTML += `<li class='bg-gray-800 p-2 rounded flex justify-between'>
+      <span>${b.nome} - R$ ${b.valor}</span>
+      <button onclick='removeBairro(${i})' class='bg-red-600 px-2 rounded'>X</button>
+    </li>`;
+  });
+}
+</script>
+</body>
+</html>
