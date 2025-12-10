@@ -178,7 +178,7 @@
     if(state.cart.length===0){ alert('Seu carrinho esta vazio!'); return; }
     if(!state.customerInfo.name || !state.customerInfo.phone || !state.customerInfo.paymentMethod){ alert('Preencha nome, telefone e forma de pagamento.'); return; }
 
-    let message = '*??? PEDIDO - CHURRASCARIA GAUCHO*\n\n';
+    let message = '* PEDIDO - CHURRASCARIA GAUCHO*\n\n';
     message += `?? *Cliente:* ${state.customerInfo.name}\n`;
     message += `?? *Telefone:* ${state.customerInfo.phone}\n`;
     if(state.customerInfo.address) message += `?? *Endereco:* ${state.customerInfo.address}\n`;
@@ -195,7 +195,7 @@
     message += `\n?? *Subtotal:* ${currency(getCartTotal())}\n`;
     const df = getDeliveryFee(); if(df>0) message += `?? *Taxa de Entrega:* ${currency(df)}\n`;
     message += `*TOTAL: ${currency(getFinalTotal())}*\n\n`;
-    message += 'Obrigado pela preferência! ??';
+    message += 'Obrigado pela preferencia! ??';
 
     const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeWhatsAppText(message)}`;
     window.open(url, '_blank');
@@ -275,7 +275,7 @@
             <div class="text-6xl mb-4">??</div>
             <h2 class="text-2xl font-bold text-gray-800 mb-2">Carrinho Vazio</h2>
             <p class="text-gray-600 mb-6">Adicione alguns itens deliciosos ao seu pedido!</p>
-            <button onclick="toggleView('menu')" class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-medium transition-colors">Ver Cardápio</button>
+            <button onclick="toggleView('menu')" class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-medium transition-colors">Ver Cardapio</button>
           </div>
         </div>
       `;
@@ -343,8 +343,8 @@
                       <option value="">Selecione a forma de pagamento</option>
                       <option value="PIX" ${state.customerInfo.paymentMethod==='PIX'?'selected':''}>PIX</option>
                       <option value="Dinheiro" ${state.customerInfo.paymentMethod==='Dinheiro'?'selected':''}>Dinheiro</option>
-                      <option value="Cartao de Credito" ${state.customerInfo.paymentMethod==='Cartao de Credito'?'selected':''}>Cartão de Crédito</option>
-                      <option value="Cartao de Debito" ${state.customerInfo.paymentMethod==='Cartao de Debito'?'selected':''}>Cartão de Débito</option>
+                      <option value="Cartao de Credito" ${state.customerInfo.paymentMethod==='Cartao de Credito'?'selected':''}>Cartao de Credito</option>
+                      <option value="Cartao de Debito" ${state.customerInfo.paymentMethod==='Cartao de Debito'?'selected':''}>Cartao de Debito</option>
                     </select>
                   </div>
 
@@ -410,7 +410,7 @@
 <!-- Painel Admin -->
 <section id="adminPanel" class="hidden p-6 bg-gray-900 text-white mt-6 rounded-xl shadow-xl">
  <h2 class="text-2xl font-bold mb-4">Painel Administrativo</h2>
- <p class="mb-4">Gerencie itens do cardápio e bairros de entrega.</p>
+ <p class="mb-4">Gerencie itens do cardapio e bairros de entrega.</p>
 
  <!-- CRUD Itens -->
  <div class="mb-8">
@@ -512,3 +512,4 @@ function render() {
 </body>
 
 </html>
+
