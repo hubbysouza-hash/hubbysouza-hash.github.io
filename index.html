@@ -15,13 +15,13 @@
   </style>
 </head>
 <body>
-    <!-- Botão Admin -->
+    <!-- BotÃ£o Admin -->
     <button id="adminBtn" class="fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded-xl shadow-lg">Admin</button>
     <script>
     document.getElementById('adminBtn').addEventListener('click', function(){
         const senha = prompt('Digite a senha de administrador:');
         if(senha === '170183_Mf'){
-            alert('Acesso liberado! Painel administrativo será exibido.');
+            alert('Acesso liberado! Painel administrativo serÃ¡ exibido.');
             document.getElementById('admin-panel')?.classList.remove('hidden');
         } else {
             alert('Senha incorreta!');
@@ -31,24 +31,24 @@
   <div id="app"></div>
 
   <!-- =====================================================
-       Arquivo único (HTML + JS) organizado para fácil edição
+       Arquivo Ãºnico (HTML + JS) organizado para fÃ¡cil ediÃ§Ã£o
        - Edite o objeto `defaultMenu` abaixo para adicionar itens
-       - As partes mais importantes estão comentadas
+       - As partes mais importantes estÃ£o comentadas
      ===================================================== -->
 
   <script>
-  // ========================= CONFIGURAÇÕES =========================
-  const WHATSAPP_NUMBER = '5511939426652'; // número para envio
+  // ========================= CONFIGURAÃ‡Ã•ES =========================
+  const WHATSAPP_NUMBER = '5511939426652'; // nÃºmero para envio
   const ADMIN_PASSWORD = '170183mf';
   const LS_MENU_KEY = 'churrascaria_menu_v1';
   const LS_CART_KEY = 'churrascaria_cart_v1';
 
-  // ========================= UTILITÁRIOS ==========================
+  // ========================= UTILITÃRIOS ==========================
   function currency(v){ if(typeof v!=='number' || isNaN(v)) return 'R$ 0,00'; return v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
   function encodeWhatsAppText(t){ return encodeURIComponent(t); }
   function uid(prefix = ''){ return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
-  // ========================= DADOS PADRÃO (EDITÁVEIS) =========================
+  // ========================= DADOS PADRÃƒO (EDITÃVEIS) =========================
   // Para adicionar novas categorias / produtos, altere apenas este objeto.
   const defaultMenu = [
     {
@@ -142,7 +142,7 @@
     customerInfo: { name: '', phone: '', address: '', neighborhood: '', paymentMethod: '' }
   };
 
-  // ========================= PERSISTÊNCIA SIMPLES =========================
+  // ========================= PERSISTÃŠNCIA SIMPLES =========================
   function saveMenuToStorage(){ localStorage.setItem(LS_MENU_KEY, JSON.stringify(state.menu)); }
   function saveCartToStorage(){ localStorage.setItem(LS_CART_KEY, JSON.stringify(state.cart)); }
 
@@ -195,7 +195,7 @@
     message += `\n?? *Subtotal:* ${currency(getCartTotal())}\n`;
     const df = getDeliveryFee(); if(df>0) message += `?? *Taxa de Entrega:* ${currency(df)}\n`;
     message += `*TOTAL: ${currency(getFinalTotal())}*\n\n`;
-    message += 'Obrigado pela preferência! ??';
+    message += 'Obrigado pela preferÃªncia! ??';
 
     const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeWhatsAppText(message)}`;
     window.open(url, '_blank');
@@ -275,7 +275,7 @@
             <div class="text-6xl mb-4">??</div>
             <h2 class="text-2xl font-bold text-gray-800 mb-2">Carrinho Vazio</h2>
             <p class="text-gray-600 mb-6">Adicione alguns itens deliciosos ao seu pedido!</p>
-            <button onclick="toggleView('menu')" class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-medium transition-colors">Ver Cardápio</button>
+            <button onclick="toggleView('menu')" class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-medium transition-colors">Ver CardÃ¡pio</button>
           </div>
         </div>
       `;
@@ -327,8 +327,8 @@
                     <input type="tel" value="${state.customerInfo.phone}" onchange="updateCustomerInfo('phone', this.value)" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" placeholder="(11) 99999-9999">
                   </div>
                   <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Endereço (Delivery)</label>
-                    <textarea onchange="updateCustomerInfo('address', this.value)" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" rows="3" placeholder="Rua, número, complemento...">${state.customerInfo.address}</textarea>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Endereco (Delivery)</label>
+                    <textarea onchange="updateCustomerInfo('address', this.value)" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" rows="3" placeholder="Rua, nÃºmero, complemento...">${state.customerInfo.address}</textarea>
                   </div>
                   <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Bairro (Taxa de Entrega)</label>
@@ -343,8 +343,8 @@
                       <option value="">Selecione a forma de pagamento</option>
                       <option value="PIX" ${state.customerInfo.paymentMethod==='PIX'?'selected':''}>PIX</option>
                       <option value="Dinheiro" ${state.customerInfo.paymentMethod==='Dinheiro'?'selected':''}>Dinheiro</option>
-                      <option value="Cartão de Crédito" ${state.customerInfo.paymentMethod==='Cartão de Crédito'?'selected':''}>Cartão de Crédito</option>
-                      <option value="Cartão de Débito" ${state.customerInfo.paymentMethod==='Cartão de Débito'?'selected':''}>Cartão de Débito</option>
+                      <option value="Cartao de Credito" ${state.customerInfo.paymentMethod==='Cartao de Credito'?'selected':''}>CartÃ£o de CrÃ©dito</option>
+                      <option value="Cartao de Debito" ${state.customerInfo.paymentMethod==='Cartao de Debito'?'selected':''}>CartÃ£o de DÃ©bito</option>
                     </select>
                   </div>
 
@@ -372,7 +372,7 @@
 
   // ========================= CONTROLE / HELPERS =========================
   function toggleView(view){ state.currentView = view; renderApp(); }
-  function updateCustomerInfo(field, value){ state.customerInfo[field] = value; /* não persistimos no storage por enquanto */ }
+  function updateCustomerInfo(field, value){ state.customerInfo[field] = value; /* nÃ£o persistimos no storage por enquanto */ }
 
   // ========================= RENDER PRINCIPAL =========================
   function renderApp(){
@@ -383,11 +383,11 @@
     `;
   }
 
-  // Inicialização
+  // InicializaÃ§Ã£o
   document.addEventListener('DOMContentLoaded', ()=>{ renderApp(); });
 
-  // ========================= FUNÇÕES ADMIN (OPCIONAL) =========================
-  // Essas funções facilitam edição futura e podem ser expostas via um painel admin.
+  // ========================= FUNÃ‡Ã•ES ADMIN (OPCIONAL) =========================
+  // Essas funÃ§Ãµes facilitam ediÃ§Ã£o futura e podem ser expostas via um painel admin.
   function adminAddCategory(name, description=''){
     const id = 'cat-' + name.toLowerCase().replace(/[^a-z0-9]+/g,'-');
     state.menu.push({ id, name, description, products: [] }); saveMenuToStorage(); renderApp();
@@ -398,26 +398,26 @@
     const cat = state.menu.find(c=>c.id===categoryId); if(!cat) return; cat.products.push(product); saveMenuToStorage(); renderApp();
   }
 
-  // Exponha funções no window para uso manual pelo dono do site (console)
+  // Exponha funÃ§Ãµes no window para uso manual pelo dono do site (console)
   window._cg = { state, saveMenuToStorage, adminAddCategory, adminAddProduct };
 
   </script>
     <!-- Painel Administrativo Oculto -->
     <div id="admin-panel" class="hidden fixed bottom-20 right-4 bg-white border p-4 shadow-xl rounded-xl w-72">
         <h2 class="font-bold mb-2">Painel Admin</h2>
-        <p>Configurações futuras podem ser adicionadas aqui.</p>
+        <p>ConfiguraÃ§Ãµes futuras podem ser adicionadas aqui.</p>
     </div>
 <!-- Painel Admin -->
 <section id="adminPanel" class="hidden p-6 bg-gray-900 text-white mt-6 rounded-xl shadow-xl">
  <h2 class="text-2xl font-bold mb-4">Painel Administrativo</h2>
- <p class="mb-4">Gerencie itens do cardápio e bairros de entrega.</p>
+ <p class="mb-4">Gerencie itens do cardÃ¡pio e bairros de entrega.</p>
 
  <!-- CRUD Itens -->
  <div class="mb-8">
    <h3 class="text-xl font-semibold mb-2">Gerenciar Itens</h3>
    <form id="itemForm" class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
      <input id="itemNome" class="p-2 rounded text-black" placeholder="Nome do item">
-     <input id="itemPreco" class="p-2 rounded text-black" placeholder="Preço">
+     <input id="itemPreco" class="p-2 rounded text-black" placeholder="PreÃ§o">
      <button type="button" onclick="addItem()" class="bg-green-600 p-2 rounded">Adicionar</button>
    </form>
    <ul id="listaItens" class="space-y-2"></ul>
@@ -510,4 +510,5 @@ function render() {
 }
 </script>
 </body>
+
 </html>
